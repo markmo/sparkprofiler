@@ -1,0 +1,112 @@
+// Build for a particular environment using `gradle -Penv=local build`
+
+buildscript {
+    repositories {
+        maven {
+            url "${artifactory_pluginsUrl}"
+            credentials {
+                username = "${artifactory_user}"
+                password = "${artifactory_password}"
+            }
+        }
+    }
+    dependencies {
+        //Check for the latest version here: http://plugins.gradle.org/plugin/com.jfrog.artifactory
+        classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:3.1.1'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'maven-publish'
+apply plugin: 'com.jfrog.artifactory'
+
+group 'io.metamorphic'
+version '1.0'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
+
+configurations {
+    provided
+    compile.extendsFrom provided
+}
+
+jar {
+    baseName = 'sparkprofiler'
+    version = '1.0'
+    manifest {
+        attributes 'Main-Class': 'io.metamorphic.sparkprofiler.Application'
+    }
+}
+
+artifactory {
+    contextUrl = "${artifactory_contextUrl}"   //The base Artifactory URL if not overridden by the publisher/resolver
+    publish {
+        repository {
+            repoKey = 'libs-release-local'
+            username = "${artifactory_user}"
+            password = "${artifactory_password}"
+            maven = true
+        }
+        defaults {
+            publications ('mavenJava')
+        }
+    }
+    resolve {
+        repository {
+            repoKey = 'libs-release'
+            username = "${artifactory_user}"
+            password = "${artifactory_password}"
+            maven = true
+        }
+    }
+}
+
+dependencies {
+    compile 'io.metamorphic:analysis-commons:1.0'
+    compile('org.apache.spark:spark-core_2.10:1.5.1') {
+        // otherwise a servlet version conflict when running in a Spring Boot application using embedded Tomcat
+        exclude group: 'javax.servlet'
+        exclude group: 'org.glassfish'
+        exclude group: 'org.eclipse.jetty.orbit'
+
+        // causing ClassNotFoundException: scala.collection.GenTraversableOnce$class
+        // if using scala-library 2.11.X when using Spark library 2.10.X
+        exclude group: 'org.scala-lang', module: 'scala-library'
+
+        exclude group: 'io.netty', module: 'netty'
+    }
+    compile('org.apache.spark:spark-sql_2.10:1.5.1') {
+        // otherwise a servlet version conflict when running in a Spring Boot application using embedded Tomcat
+        exclude group: 'javax.servlet'
+        exclude group: 'org.glassfish'
+        exclude group: 'org.eclipse.jetty.orbit'
+
+        // causing ClassNotFoundException: scala.collection.GenTraversableOnce$class
+        // if using scala-library 2.11.X when using Spark library 2.10.X
+        exclude group: 'org.scala-lang', module: 'scala-library'
+
+        exclude group: 'io.netty', module: 'netty'
+    }
+    compile 'io.netty:netty:3.6.6.Final'
+    compile 'org.scala-lang:scala-library:2.10.4'
+
+    compile 'org.apache.commons:commons-lang3:3.4'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.4.6'
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+    testCompile 'javax.servlet:javax.servlet-api:3.1.0'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.5'
+    distributionUrl = "https://services.gradle.org/distributions/gradle-$gradleVersion-all.zip"
+}
